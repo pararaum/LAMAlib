@@ -228,10 +228,15 @@
 ;; Registers modified: A,Y,X
 .macro  printax
 .scope
+	.if ::USE_BASIC_ROM>0
                 sta setx +1     ;we need to switch A and X
                 txa
 setx:           ldx #00
                 jsr LINPRT
+	.else
+		.import _printax_sr
+		jsr _printax_sr
+	.endif
 .endscope
 .endmacro
 
@@ -248,10 +253,17 @@ setx:           ldx #00
                 lda #'-'        ;write out minus sign
                 jsr CHROUT
                 pla
-positive:       sta setx +1     ;we need to switch A and X
+positive:       
+
+	.if ::USE_BASIC_ROM>0
+                sta setx +1     ;we need to switch A and X
                 txa
 setx:           ldx #00
                 jsr LINPRT
+	.else
+		.import _printax_sr
+		jsr _printax_sr
+	.endif
 .endscope
 .endmacro
 
@@ -260,11 +272,14 @@ setx:           ldx #00
 ;; BASIC and KERNAL ROM need to be enabled when using this function
 ;; Registers modified: A,Y,X
 .macro  printstr   addr
-.scope
                 lda #<addr
                 ldy #>addr
+	.if USE_BASIC_ROM>0
                 jsr STROUT
-.endscope
+	.else
+		.import _strout_sr
+		jsr _strout_sr
+	.endif
 .endmacro
 
 ;; newline
@@ -331,6 +346,35 @@ setx:           ldx #00
 .endmacro
 
 
+;; turn_on_cursor
+;; Shows the blinking cursor during program execution
+;; Requires the KERNAL IRQ routines to be active
+;; if this function is used on the C128, a bank with visible ROM must be active.
+;; Turn off cursor briefly before output of a char, otherwise you get inverse character artifacts when blink phase is on
+.macro turn_on_cursor
+.if .def(__C128__)
+	jsr $CD6F	;Bank 15 needs to be enabled
+.else
+	lda #0
+	sta 204		;cursor visibility switch for C64, VIC20
+.endif
+.endmacro
+
+
+;; turn_off_cursor
+;; Turns off the blinking cursor and restores the character and color under cursor if necessary.
+;; Requires the KERNAL IRQ routines to be active
+;; If this function is used on the C128, a bank with visible ROM must be active.
+;; Use this before output of a char, otherwise you get inverse character artifacts when blink phase is on
+.macro turn_off_cursor
+.if .def(__C128__)
+	jsr $CD9F	;bank 15 needs to be enabled
+.else
+.import _turn_off_cursor_sr
+	jsr _turn_off_cursor_sr
+.endif
+.endmacro	
+
 
 ;; lowercase_mode
 ;; Switches charset to upper/lowercase (text mode) setting and locks the CBM+Shift switch
@@ -395,6 +439,30 @@ setx:           ldx #00
        .endif
        .if (arg)=1
             .error "cannot delay a single cycle since the shortest command takes 2 cycles"
+            .exitmacro
+       .endif
+       .if (arg)=53 .or (arg)>54
+	    .import _delay_53cycles
+	    jsr _delay_53cycles
+            delay_cycles ((arg)-53)
+            .exitmacro
+       .endif
+       .if (arg)=47 .or (arg)>48
+	    .import _delay_47cycles
+	    jsr _delay_47cycles
+            delay_cycles ((arg)-47)
+            .exitmacro
+       .endif
+       .if (arg)=43 .or (arg)>44
+	    .import _delay_43cycles
+	    jsr _delay_43cycles
+            delay_cycles ((arg)-43)
+            .exitmacro
+       .endif
+       .if (arg)=31 .or (arg)>32
+	    .import _delay_31cycles
+	    jsr _delay_31cycles
+            delay_cycles ((arg)-31)
             .exitmacro
        .endif
        .if (arg)=7 .or (arg)>8
@@ -737,7 +805,7 @@ L1:
         .endscope
 .endmacro
 
-;; loadprg filename[,devicenr[,loadaddr]]
+;; load_prg filename[,devicenr[,loadaddr]]
 ;; Wrapper around ROM load function, prg means that the file is assumed to have a two-byte load address at its start
 ;; if device number is 0 or not stated, the last used device numner stored in address $BA is used. In case $BA contains 0, 8 is used as default
 ;; if loadaddr is omitted, the load address is defined by the first two bytes of the file
@@ -747,7 +815,7 @@ L1:
 ;;  A = $1D (LOAD ERROR)
 ;;  A = $00 (BREAK, RUN/STOP has been pressed during loading)
 ;; Registers modified: A,X,Y
-.macro loadprg filename,devicenr,loadaddr
+.macro load_prg filename,devicenr,loadaddr
         .scope
         lda #endfilename-beginfilename
 	ldx #<beginfilename
@@ -790,7 +858,7 @@ endfilename:
         .endscope
 .endmacro
 
-;; saveprg filename,devicenr,startaddr,endaddr
+;; save_prg filename,devicenr,startaddr,endaddr
 ;; Saves the memory from startaddr to endaddr (including the endaddr) using the CBM ROM save function.
 ;; The file will have a two-byte load address at its start
 ;; if device number is 0, the last used device numner stored in address $BA is used. In case $BA contains 0, 8 is used as default
@@ -798,7 +866,7 @@ endfilename:
 ;;  A = $05 (DEVICE NOT PRESENT)
 ;;  A = $00 (BREAK, RUN/STOP has been pressed during saving)
 ;; Registers modified: A,X,Y
-.macro saveprg filename,devicenr,startaddr,endaddr
+.macro save_prg filename,devicenr,startaddr,endaddr
         .scope
         lda #endfilename-beginfilename
 	ldx #<beginfilename
@@ -827,12 +895,12 @@ endfilename:
         .endscope
 .endmacro
 
-;; scratchfile filename[,devicenr]
-;; Deletes a file on disk. If device number is not stated or 0, the last used device numner stored in address $BA is used. In case $BA contains 0, 8 is used as default.
+;; scratch_file filename[,devicenr]
+;; Deletes a file on disk. If device number is not stated or 0, the last used device number stored in address $BA is used. In case $BA contains 0, 8 is used as default.
 ;; Registers modified: A,X,Y
-.macro scratchfile filename,devicenr
+.macro scratch_file filename,devicenr
 	.if .paramcount = 1
-          scratchfile filename,0
+          scratch_file filename,0
           .exitmacro
         .endif
 
@@ -1011,5 +1079,3 @@ loop:
 	pla
         .endscope
 .endmacro
-
-	

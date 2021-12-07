@@ -42,9 +42,10 @@ for %%f in (*.s) do (
 )
 
 for %%f in (*.o) do (
-    ar65 d ..\LAMAlib.lib %%f
-    ar65 a ..\LAMAlib.lib %%f
+    ar65 a LAMAlib.lib %%f
 )
+
+move /y LAMAlib.lib ..
 
 echo Library has been created with %count% modules in it.
 cd ..
@@ -56,7 +57,7 @@ for /F %%I in ('where cc65.exe') do (
 
 @copy LAMAlib*.inc "%CC65PATH%\asminc"
 @copy LAMAlib.lib "%CC65PATH%\lib"
-@copy c64-basicfriendly-asm.cfg "%CC65PATH%\cfg"
+@copy *-basicfriendly-asm.cfg "%CC65PATH%\cfg"
 @copy ass.bat "%CC65PATH%\bin"
 
 echo %white%
