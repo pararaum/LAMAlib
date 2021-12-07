@@ -3,11 +3,12 @@
 CC65DIR=/usr/share/cc65
 CC65LIBDIR=$(CC65DIR)/lib
 CC65ASMINCDIR=$(CC65DIR)/asminc
-CC65CFGDIR=$(CC65DIR)/asminc
+CC65CFGDIR=$(CC65DIR)/cfg
 #
 AS=ca65
 ASFLAGS=-t c64
 
+CONFIGURATIONS=c128-basicfriendly-asm.cfg  c64-basicfriendly-asm.cfg
 SOURCES=$(wildcard lib-functions/*.s)
 OBJS=$(SOURCES:.s=.o)
 
@@ -20,24 +21,15 @@ clean:
 	rm -f lib-functions/*.o
 
 install:	all
-	echo mkdir -p $(CC65LIBDIR) $(CC65ASMINCDIR) $(CC65CFGDIR)
-	echo cp LAMAlib.lib $(CC65LIBDIR)
-	echo cp LAMAlib*.inc $(CC65ASMINCDIR)
-	echo cp c64-basicfriendly-asm.cfg $(CC65CFGDIR)
-	echo -e $green
-	echo -e "*******************************************************************************"
-	echo -e "* Congratulations, LAMAlib has been installed!                                *"
-	echo -e "*                                                                             *"
-	echo -e "* To use it, add the line                                                     *"
-	echo -e "* \033[0;36m.include "LAMAlib.inc"${green} to the top of your assembler file and assemble with    *"
-	echo -e "* \033[0;36mcl65 yourprog.s -lib LAMAlib.lib -C c64-asm.cfg -o yourprog.prg${green}             *"
-	echo -e "* There is no overhead to your assembled program for unused functions         *"
-	echo -e "*******************************************************************************${nocolor}"
+	mkdir -p $(CC65LIBDIR) $(CC65ASMINCDIR) $(CC65CFGDIR)
+	cp LAMAlib.lib $(CC65LIBDIR)
+	cp LAMAlib*.inc $(CC65ASMINCDIR)
+	cp $(CONFIGURATIONS) $(CC65CFGDIR)
 
 uninstall:
 	rm -f $(CC65LIBDIR)/LAMAlib.lib
 	rm -f $(CC65ASMINCDIR)/LAMAlib*.inc
-	rm -f $(CC65CFGDIR)/c64-basicfriendly-asm.cfg
+	rm -f $(addprefix $(CC65CFGDIR)/, $(CONFIGURATIONS))
 
 LAMAlib.lib:	$(OBJS)
 	ar65 a LAMAlib.lib $+
