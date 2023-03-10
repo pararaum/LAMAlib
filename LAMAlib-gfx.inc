@@ -1,15 +1,19 @@
 ;; <h2>Hires Graphics Functions - CURRENTLY UNDER DEVELOPMENT</h2>
 
 ;; blank_screen
-;; Blanks the screen and shows only the border color
+;; Waits until rasterbar is below screen area, then blanks the screen and shows only the border color
 .macro blank_screen
+.scope
+:	lda $D012
+	bpl :-      ;wait until rasterbar is below screen area
 	lda $D011   ;bit 4 off = Screen blanked
 	and #%11101111
 	sta $D011 
+.endscope
 .endmacro
 
 ;; unblank_screen
-;; Blanks the screen and shows only the border color
+;; Shows the screen again after it was blanked, effective with next frame
 .macro unblank_screen
 	lda $D011   ;bit 4 on = Screen visible
 	ora #%00010000
@@ -49,12 +53,24 @@
 .endscope
 .endmacro
 
-;; gfx_init
+;; gfx_init [gfxtablebase]
 ;; Initializes the look up tables used by the gfx_plot function
+;; The optional argument defines where the look up tables needed by gfx_pset and gfx_pclr are placed ($2c9 bytes). This address should be page-aligned ($xx00). Without the argument, the address $9000 is used as a default.
 ;; This macro needs to be called once before using gfx_plot or any function that uses gfx_plot (e.g. gfx_line)
-;; Uses all registers and overwrites memory area $9000 - $92C7
+;; Uses all registers and overwrites memory area gfxtables 
 .import _gfx_init_sr
-.macro gfx_init
+.macro gfx_init gfxtablebase
+	.if .PARAMCOUNT = 1
+	  .ifdef gfxtables
+	    .error "gfxtables alreads defined"
+	   .endif
+	  gfxtables = gfxtablebase
+	.else
+	  .ifndef gfxtables
+	    gfxtables = $9000
+	  .endif
+	.endif
+	.export gfxtables
 	jsr _gfx_init_sr
 .endmacro
 

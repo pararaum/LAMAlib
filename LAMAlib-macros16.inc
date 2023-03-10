@@ -1,6 +1,7 @@
 ;; <h2>16-bit Emulation Macros</h2>
 
-;; ldax addr, ldax #arg
+;; ldax addr
+;; ldax #arg
 ;; Loads a 16-bit value into A/X, either from an address or as immediate value
 ;; Note that the zero flag is not indicating 0 but indicating a value <256
 ;; Supports zero page addressing mode
@@ -36,8 +37,9 @@
 .endscope
 .endmacro
 
-;; adcax addr, adcax #arg
-;; Adds a 16 bit value at an addr or as immediate value to 16 bit value in registers A/X
+;; adcax addr
+;; adcax #arg
+;; Adds a 16 bit value with carry at an addr or as immediate value to 16 bit value in registers A/X
 ;; Supports zero page addressing mode
 ;; Result is returned in A/X
 ;; Registers modified: A,X
@@ -63,8 +65,20 @@
 .endscope
 .endmacro
 
-;; sbcax addr, sbcax #arg
-;; Subtracts the 16 bit value at an addr or as immediate value from  16 bit value in registers A/X
+;; addax addr
+;; adcax #arg
+;; Adds a 16 bit value without carry at an addr or as immediate value to 16 bit value in registers A/X
+;; Supports zero page addressing mode
+;; Result is returned in A/X
+;; Registers modified: A,X
+.macro addax arg
+	clc
+	adcax arg
+.endmacro
+
+;; sbcax addr
+;; sbcax #arg
+;; Subtracts the 16 bit value with carry at an addr or as immediate value from  16 bit value in registers A/X
 ;; Supports zero page addressing mode
 ;; Result is returned in A/X
 ;; Registers modified: A,X
@@ -90,7 +104,110 @@
 .endscope
 .endmacro
 
-;; cmpax addr, cmpax #arg
+;; subax addr
+;; sbcax #arg
+;; Subtracts the 16 bit value with carry at an addr or as immediate value from  16 bit value in registers A/X
+;; Supports zero page addressing mode
+;; Result is returned in A/X
+;; Registers modified: A,X
+.macro subax arg
+	sec
+	sbcax arg
+.endmacro
+
+;; rsc arg
+;; rsc #arg
+;; Reverse subtraction with carry, calculate the value of arg - A - C
+;; if the carry is clear before the command, this behaves like rsc
+;; If there is an underflow (arg is larger than A), the carry bit will be set, otherwise carry is clear
+.macro rsc arg
+.scope
+	sbc arg
+	eor #$ff
+.endscope
+.endmacro
+
+;; rsb arg
+;; rsb #arg
+;; Reverse subtraction, calculate the value of arg - A 
+;; The result is not influenced by the carry
+;; If there is an underflow (arg is larger than A), the carry bit will be set, otherwise carry is clear
+.macro rsb arg
+.scope
+	clc
+	sbc arg
+	eor #$ff
+.endscope
+.endmacro
+
+;; rscax arg
+;; rscax #arg
+;; 16 bit reverse subtraction, calculate the value of arg - AX - C
+;; if the carry is clear before the command, this behaves like rsbax
+;; If there is an underflow (arg is larger than AX), the carry bit will be set, otherwise carry is clear
+.macro rscax arg
+.scope
+        .if (.match (.left (1, {arg}), #))
+           ; immediate mode
+           sbc #<(.right (.tcount ({arg})-1, {arg}))
+           eor #$ff
+           pha
+           txa
+           sbc #>(.right (.tcount ({arg})-1, {arg}))
+           eor #$ff
+	   tax
+	   pla
+	.else 
+           ; absolute or zero page
+           sbc arg
+           eor #$ff
+           pha
+           txa
+           sbc 1+(arg)
+           eor #$ff
+	   tax
+	   pla	   
+	.endif
+.endscope
+.endmacro
+
+;; rsbax arg
+;; rsbax #arg
+;; 16 bit reverse subtraction, calculate the value of arg - AX 
+;; The result is not influenced by the carry
+;; If there is an underflow (arg is larger than AX), the carry bit will be set, otherwise carry is clear
+.macro rsbax arg
+.scope
+        .if (.match (.left (1, {arg}), #))
+           ; immediate mode
+           clc
+           sbc #<(.right (.tcount ({arg})-1, {arg}))
+           eor #$ff
+           pha
+           txa
+           sbc #>(.right (.tcount ({arg})-1, {arg}))
+           eor #$ff
+	   tax
+	   pla
+	.else 
+           ; absolute or zero page
+           clc
+           sbc arg
+           eor #$ff
+           pha
+           txa
+           sbc 1+(arg)
+           eor #$ff
+	   tax
+	   pla	   
+	.endif
+.endscope
+.endmacro
+
+
+
+;; cmpax addr
+;; cmpax #arg
 ;; Compares the value in A/X with the 16 bit value in addr or the immediate value
 ;; Supports zero page addressing mode
 ;; Result is returned in A/X
@@ -112,7 +229,8 @@ end:
 .endscope
 .endmacro
 
-;; orax addr, orax #arg
+;; orax addr
+;; orax #arg
 ;; Calculates the bitwise OR operation between A/X and a 16 bit value at an addr or as immediate value
 ;; Supports zero page addressing mode
 ;; Result is returned in A/X
@@ -144,7 +262,8 @@ end:
 .endscope
 .endmacro
 
-;; andax addr, andax #arg
+;; andax addr
+;; andax #arg
 ;; Calculates the bitwise AND operation between A/X and a 16 bit value at an addr or as immediate value
 ;; Supports zero page addressing mode
 ;; Result is returned in A/X
@@ -176,7 +295,8 @@ end:
 .endscope
 .endmacro
 
-;; eorax addr, eorax #arg
+;; eorax addr
+;; eorax #arg
 ;; Calculates the bitwise exclusive-or operation between A/X and a 16 bit value at addr or as immediate value
 ;; Supports zero page addressing mode
 ;; Result is returned in A/X
@@ -516,7 +636,7 @@ savea:		lda #00
 ;; arg2 can be a constant or A, X or Y
 .macro  poke arg1,arg2
 .scope
-        .if (.xmatch ({arg1}, {AX}))          ;AX is used as address
+        .if (.xmatch ({arg1}, {AX}) .or .xmatch ({arg1}, {ax}))          ;AX is used as address
           sta targetsm+1
           stx targetsm+2
           .if (.xmatch ({arg2}, {Y}))         ;value in Y register is to be poked
@@ -540,6 +660,7 @@ savea:		lda #00
 .endscope
 .endmacro
 
+
 ;; pokew arg1,arg2
 ;; poke word: copies 16 bit value arg2 into the address of arg1 and arg1+1
 ;; arg1 will be filled with low byte of arg2
@@ -549,7 +670,7 @@ savea:		lda #00
 
 .macro  pokew arg1,arg2
 .scope
-        .if (.xmatch ({arg1}, {AX}))          ;AX is used as address
+        .if (.xmatch ({arg1}, {AX}) .or .xmatch ({arg1}, {ax}))         ;AX is used as address
 .importzp _zp_ptr1
           sta _zp_ptr1
           stx _zp_ptr1+1
@@ -560,7 +681,7 @@ savea:		lda #00
           iny
           sta (_zp_ptr1),y
         .else                                ;address is a given constant
-          .if (.xmatch ({arg2}, {AX}))       ;value to be poked in AX
+          .if (.xmatch ({arg2}, {AX}) .or .xmatch ({arg2}, {ax}))       ;value to be poked in AX
             sta arg1
             stx arg1+1
           .else                              ;value to be poked is a given constant
@@ -571,4 +692,22 @@ savea:		lda #00
           .endif
         .endif
 .endscope
+.endmacro
+
+;; jsr_ind addr
+;; Executes a subroutine by a vector stored in addr and returns to the command after jsr_ind upon completion with an rts
+;; arg1 will be a 16 bit address containing the vector to jump to
+;; Regs changed: none 
+
+.macro  jsr_ind addr
+.scope
+	store A
+	lda #>ret
+	pha
+	lda #<ret
+	pha
+	restore A
+ret=*+2		;the jmp () has three bytes, but ret must be decreased by 1
+.endscope
+	jmp (addr)
 .endmacro

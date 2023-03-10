@@ -1,6 +1,6 @@
 ; <h1>LAMAlib - Lightweight Assembler MAcro library for cc65</h1>
-; Version: 0.20
-; Date: 2021-02-18
+; Version: 0.211
+; Date: 2022-09-15
 ; Author: Wil Elmenreich (wilfried at gmx dot at)
 ; License: The Unlicense (public domain)
 ;
@@ -18,10 +18,15 @@
 ; In your programs,
 ; <ul><li>add a line <tt>.include "LAMAlib.inc"</tt> at the top of your assembler file
 ; <li>assemble with command <tt>cl65 yourprog.s -lib LAMAlib.lib -C c64-asm.cfg -u __EXEHDR__ -o yourprog.prg</tt>
+; <li>alternatively, use the provided shellscripts ass.bat / ass.sh: <tt>ass yourprog.s</tt>
 ; </ul>
 ;
+; Usage: <tt>ass [-20|-128] asmfile [startaddr]</tt>
+;
+; Calls the cl65 assembler and linker and creates an executable <tt>.PRG</tt> for the C64, unless <tt>-20</tt> or <tt>-128</tt> is specified, then the program will be assembled for the VIC20 or C128, respectively.
+;
 ; <h3>Possibility 2: Keep LAMAlib separately</h3>
-; Keep a copy of the LAMAlib folder in a sister directory of your project.
+; Keep a copy of the LAMAlib folder in a sister directory of your project. You need then to link to the library via its relative or absolute path.
 ;
 ; In your programs,
 ; <ul><li>add a line <tt>.include "../LAMAlib/LAMAlib.inc"</tt> at the top of your assembler file (the forward slash works on Linux as well as on Linux systems)
@@ -30,8 +35,8 @@
 ; </ul>
 ;
 ; <h2>Points to remember</h2>
-; Please note that the zero flag for 16/24/32 bit operations is not properly set for most macros except CMP. For example after a 16 bit calculation, a CMPAX #00 is necessary to test for zero in AX.
-; Instead of zero page variable , the library functions uses self-contained self-modifying codeblocks whenever possible, but some of the more complex functions like division and multiplication use zero page addresses, they are reserved in the segment "ZEROPAGE". 
+; Please note that the zero flag for 16 operations is not properly set for most macros except CMP. For example after a 16 bit calculation, a CMPAX #00 is necessary to test for zero in AX.
+; Instead of many zero page variables, the library functions uses self-contained self-modifying codeblocks whenever possible, but some of the more complex functions like division and multiplication use zero page addresses, they are reserved in the segment "ZEROPAGE". 
 ; 
 ;
 ; <h1>Command documentation</h1>
@@ -44,11 +49,16 @@
 ; USE_BASIC_ROM does not actually change the ROM configuration.
 ; The switch can be changed multiple times to create program parts using the ROM and parts that do not.
 
+.ifndef LAMAlib_inc
+
+LAMAlib_inc=1
 
 .include "LAMAlib-macros16.inc"
 .include "LAMAlib-ROMfunctions.inc"
 .include "LAMAlib-gfx.inc"
 .include "LAMAlib-structured.inc"
 .include "LAMAlib-routines.inc"
+.include "LAMAlib-BASIC.inc"
 .include "LAMAlib-C128only.inc"
 
+.endif
